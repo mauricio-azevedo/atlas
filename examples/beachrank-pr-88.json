@@ -1,0 +1,169 @@
+{
+  "schemaVersion": "atlas.projectBrief.v1",
+  "subject": "PR #88: Redesign BeachRank with Apple-inspired mobile UI",
+  "repository": "mauricio-azevedo/beachrank",
+  "status": "ready",
+  "confidence": "medium",
+  "executiveSummary": "PR #88 changes 16 files with 275 additions and 176 deletions. Atlas classifies it as ready. Validation: 2 validation signal(s) passed; 1 failure(s) are marked as baseline debt.",
+  "validation": [
+    {
+      "label": "web build",
+      "status": "passed",
+      "summary": "The web build passed in local validation."
+    },
+    {
+      "label": "mobile visual smoke test",
+      "status": "passed",
+      "summary": "No visibly broken mobile screens were found during manual smoke testing."
+    },
+    {
+      "label": "web lint",
+      "status": "failed",
+      "summary": "Lint fails, but the same failures are present on main, so this is baseline debt rather than a PR regression.",
+      "isBaselineFailure": true
+    }
+  ],
+  "changedFiles": [
+    {
+      "path": "web/src/app/globals.css",
+      "status": "modified",
+      "additions": 107,
+      "deletions": 66
+    },
+    {
+      "path": "web/src/app/layout.tsx",
+      "status": "modified",
+      "additions": 14,
+      "deletions": 4
+    },
+    {
+      "path": "web/src/app/page.tsx",
+      "status": "modified",
+      "additions": 37,
+      "deletions": 20
+    },
+    {
+      "path": "web/src/components/app-shell.tsx",
+      "status": "modified",
+      "additions": 6,
+      "deletions": 5
+    },
+    {
+      "path": "web/src/components/bottom-nav.tsx",
+      "status": "modified",
+      "additions": 5,
+      "deletions": 5
+    },
+    {
+      "path": "web/src/components/page-header.tsx",
+      "status": "modified",
+      "additions": 5,
+      "deletions": 5
+    },
+    {
+      "path": "web/src/components/ui/badge.tsx",
+      "status": "modified",
+      "additions": 6,
+      "deletions": 6
+    },
+    {
+      "path": "web/src/components/ui/button.tsx",
+      "status": "modified",
+      "additions": 8,
+      "deletions": 8
+    },
+    {
+      "path": "web/src/components/ui/card.tsx",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 3
+    },
+    {
+      "path": "web/src/components/ui/input.tsx",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 1
+    },
+    {
+      "path": "web/src/features/feed/components/feed-item-card.tsx",
+      "status": "modified",
+      "additions": 10,
+      "deletions": 10
+    },
+    {
+      "path": "web/src/features/groups/components/group-detail-tabs.tsx",
+      "status": "modified",
+      "additions": 16,
+      "deletions": 10
+    },
+    {
+      "path": "web/src/features/groups/components/my-groups-list.tsx",
+      "status": "modified",
+      "additions": 7,
+      "deletions": 7
+    },
+    {
+      "path": "web/src/features/matches/components/matches-list.tsx",
+      "status": "modified",
+      "additions": 12,
+      "deletions": 10
+    },
+    {
+      "path": "web/src/features/profile/components/profile-header.tsx",
+      "status": "modified",
+      "additions": 34,
+      "deletions": 12
+    },
+    {
+      "path": "web/src/features/profile/components/profile-tabs.tsx",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 4
+    }
+  ],
+  "findings": [
+    {
+      "kind": "fact",
+      "title": "Pull request scope",
+      "summary": "The PR changes 16 files with 275 additions and 176 deletions.",
+      "confidence": "high",
+      "sourceUrl": "https://github.com/mauricio-azevedo/beachrank/pull/88"
+    },
+    {
+      "kind": "fact",
+      "title": "web build passed",
+      "summary": "The web build passed in local validation.",
+      "confidence": "medium",
+      "sourceUrl": "https://github.com/mauricio-azevedo/beachrank/pull/88"
+    },
+    {
+      "kind": "fact",
+      "title": "mobile visual smoke test passed",
+      "summary": "No visibly broken mobile screens were found during manual smoke testing.",
+      "confidence": "medium",
+      "sourceUrl": "https://github.com/mauricio-azevedo/beachrank/pull/88"
+    },
+    {
+      "kind": "decision",
+      "title": "web lint is baseline debt",
+      "summary": "Lint fails, but the same failures are present on main, so this is baseline debt rather than a PR regression. Atlas will not treat this as a regression introduced by the PR.",
+      "confidence": "medium",
+      "sourceUrl": "https://github.com/mauricio-azevedo/beachrank/pull/88"
+    }
+  ],
+  "nextSteps": [
+    {
+      "kind": "recommendation",
+      "title": "Proceed to human review",
+      "summary": "No blocking GitHub metadata or validation signal was detected. Product and UX intent still need human judgment.",
+      "confidence": "medium",
+      "sourceUrl": "https://github.com/mauricio-azevedo/beachrank/pull/88"
+    }
+  ],
+  "sources": [
+    {
+      "label": "PR #88",
+      "url": "https://github.com/mauricio-azevedo/beachrank/pull/88"
+    }
+  ]
+}
