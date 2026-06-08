@@ -8,6 +8,7 @@
     "brief": "tsx src/cli/main.ts brief",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx src/brief.test.ts",
     "format": "prettier . --write --ignore-unknown",
     "format:check": "prettier . --check --ignore-unknown"
   },
