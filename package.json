@@ -1,13 +1,22 @@
 {
   "name": "atlas",
-  "version": "1.0.0",
-  "main": "index.js",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "GitHub PR to project brief generator.",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "brief": "tsx src/cli/main.ts brief",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "format": "prettier . --write --ignore-unknown",
+    "format:check": "prettier . --check --ignore-unknown"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mauricio-azevedo/atlas.git"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "keywords": [],
   "author": "",
@@ -16,5 +25,10 @@
     "url": "https://github.com/mauricio-azevedo/atlas/issues"
   },
   "homepage": "https://github.com/mauricio-azevedo/atlas#readme",
-  "description": ""
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "prettier": "^3.8.3",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
 }
