@@ -59,6 +59,7 @@ const broadSurfaceSnapshot = makeSnapshot({
   files: [
     'web/src/app/globals.css',
     'web/src/components/bottom-nav.tsx',
+    'web/src/components/page-header.tsx',
     'web/src/components/ui/button.tsx',
     'web/src/features/feed/components/feed-item-card.tsx',
     'web/src/features/groups/components/group-detail-tabs.tsx',
@@ -83,8 +84,17 @@ assert.deepEqual(
     'Profile and users',
   ],
 );
+assert.deepEqual(
+  broadSurfaceBrief.reviewFocus.find((area) => area.label === 'UI primitives')?.files,
+  ['web/src/components/page-header.tsx', 'web/src/components/ui/button.tsx'],
+);
 assert.equal(
-  broadSurfaceBrief.findings.some((finding) => finding.title === 'Broad user-facing review surface'),
+  broadSurfaceBrief.findings.some(
+    (finding) =>
+      finding.title === 'Broad user-facing review surface' &&
+      finding.summary.includes('7 user-facing review areas') &&
+      !finding.summary.includes('Other'),
+  ),
   true,
 );
 assert.equal(broadSurfaceBrief.nextSteps[0]?.title, 'Proceed with focused human review');
