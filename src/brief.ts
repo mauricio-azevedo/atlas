@@ -21,6 +21,12 @@ export type BriefFinding = {
   sourceUrl: string;
 };
 
+export type ReviewFocusArea = {
+  label: string;
+  summary: string;
+  files: string[];
+};
+
 export type ProjectBrief = {
   schemaVersion: typeof PROJECT_BRIEF_SCHEMA_VERSION;
   subject: string;
@@ -29,6 +35,7 @@ export type ProjectBrief = {
   confidence: Confidence;
   executiveSummary: string;
   validation: ValidationSignal[];
+  reviewFocus: ReviewFocusArea[];
   findings: BriefFinding[];
   nextSteps: BriefFinding[];
   changedFiles: Array<{
@@ -43,6 +50,7 @@ export type ProjectBrief = {
 export function buildPrBrief(snapshot: PullRequestSnapshot, validation: ValidationSignal[] = []): ProjectBrief {
   const pr = snapshot.pullRequest;
   const allValidation = [...buildWorkflowValidationSignals(snapshot.workflowRuns), ...validation];
+  const reviewFocus = buildReviewFocus(snapshot);
   const status = classifyStatus(snapshot, allValidation);
   const sourceUrl = pr.html_url;
 
@@ -54,6 +62,7 @@ export function buildPrBrief(snapshot: PullRequestSnapshot, validation: Validati
     confidence: 'medium',
     executiveSummary: buildExecutiveSummary(snapshot, status, allValidation),
     validation: allValidation,
+    reviewFocus,
     changedFiles: snapshot.files.map((file) => ({
       path: file.filename,
       status: file.status,
@@ -68,12 +77,103 @@ export function buildPrBrief(snapshot: PullRequestSnapshot, validation: Validati
         confidence: 'high',
         sourceUrl,
       },
-      ...buildRiskFindings(snapshot),
+      ...buildRiskFindings(snapshot, reviewFocus),
       ...buildValidationFindings(snapshot, allValidation),
     ],
-    nextSteps: buildNextSteps(snapshot, status),
+    nextSteps: buildNextSteps(snapshot, status, reviewFocus),
     sources: [{ label: `PR #${pr.number}`, url: sourceUrl }],
   };
+}
+
+function buildReviewFocus(snapshot: PullRequestSnapshot): ReviewFocusArea[] {
+  const groupedFiles = new Map<string, string[]>();
+
+  for (const file of snapshot.files) {
+    const area = classifyFileArea(file.filename);
+    groupedFiles.set(area, [...(groupedFiles.get(area) ?? []), file.filename]);
+  }
+
+  return REVIEW_FOCUS_AREA_ORDER.flatMap((area) => {
+    const files = groupedFiles.get(area) ?? [];
+
+    if (files.length === 0) {
+      return [];
+    }
+
+    return [
+      {
+        label: area,
+        summary: buildReviewFocusSummary(area, files),
+        files,
+      },
+    ];
+  });
+}
+
+const REVIEW_FOCUS_AREA_ORDER = [
+  'Global visual system',
+  'App shell and navigation',
+  'UI primitives',
+  'Home and feed',
+  'Groups',
+  'Matches',
+  'Profile and users',
+  'Other',
+] as const;
+
+function classifyFileArea(path: string): (typeof REVIEW_FOCUS_AREA_ORDER)[number] {
+  if (path.endsWith('/globals.css') || path.endsWith('/layout.tsx')) {
+    return 'Global visual system';
+  }
+
+  if (path.includes('/components/app-shell') || path.includes('/components/bottom-nav')) {
+    return 'App shell and navigation';
+  }
+
+  if (path.includes('/components/ui/')) {
+    return 'UI primitives';
+  }
+
+  if (path.endsWith('/src/app/page.tsx') || path.includes('/features/feed/')) {
+    return 'Home and feed';
+  }
+
+  if (path.includes('/features/groups/')) {
+    return 'Groups';
+  }
+
+  if (path.includes('/features/matches/')) {
+    return 'Matches';
+  }
+
+  if (path.includes('/features/profile/') || path.includes('/features/users/')) {
+    return 'Profile and users';
+  }
+
+  return 'Other';
+}
+
+function buildReviewFocusSummary(area: string, files: string[]) {
+  const count = `${files.length} file${files.length === 1 ? '' : 's'}`;
+
+  switch (area) {
+    case 'Global visual system':
+      return `${count} affecting global styling, metadata, or app-level layout.`;
+    case 'App shell and navigation':
+      return `${count} affecting the persistent shell or primary navigation.`;
+    case 'UI primitives':
+      return `${count} affecting shared components used across multiple screens.`;
+    case 'Home and feed':
+      return `${count} affecting the home surface or activity feed.`;
+    case 'Groups':
+      return `${count} affecting group discovery, group detail, or group membership surfaces.`;
+    case 'Matches':
+      return `${count} affecting match lists, match entry, or match presentation.`;
+    case 'Profile and users':
+      return `${count} affecting profile or user identity surfaces.`;
+    default:
+      return `${count} outside Atlas' current area classifier.`;
+  }
 }
 
 function buildWorkflowValidationSignals(workflowRuns: WorkflowRun[]): ValidationSignal[] {
@@ -163,7 +263,7 @@ function buildExecutiveSummary(
   ].join(' ');
 }
 
-function buildRiskFindings(snapshot: PullRequestSnapshot): BriefFinding[] {
+function buildRiskFindings(snapshot: PullRequestSnapshot, reviewFocus: ReviewFocusArea[]): BriefFinding[] {
   const pr = snapshot.pullRequest;
   const findings: BriefFinding[] = [];
 
@@ -192,6 +292,16 @@ function buildRiskFindings(snapshot: PullRequestSnapshot): BriefFinding[] {
       kind: 'risk',
       title: 'Large review surface',
       summary: 'The PR is large enough that hidden regressions are more likely. Prefer focused review by flow or subsystem.',
+      confidence: 'medium',
+      sourceUrl: pr.html_url,
+    });
+  }
+
+  if (reviewFocus.filter((area) => area.label !== 'Other').length >= 4) {
+    findings.push({
+      kind: 'risk',
+      title: 'Broad user-facing review surface',
+      summary: `The PR touches ${reviewFocus.length} review areas: ${reviewFocus.map((area) => area.label).join(', ')}. Validate the primary flows across affected surfaces, not just individual files.`,
       confidence: 'medium',
       sourceUrl: pr.html_url,
     });
@@ -247,15 +357,23 @@ function buildValidationFindings(
   });
 }
 
-function buildNextSteps(snapshot: PullRequestSnapshot, status: BriefStatus): BriefFinding[] {
+function buildNextSteps(
+  snapshot: PullRequestSnapshot,
+  status: BriefStatus,
+  reviewFocus: ReviewFocusArea[],
+): BriefFinding[] {
   const pr = snapshot.pullRequest;
 
   if (status === 'ready') {
+    const broadReviewSurface = reviewFocus.filter((area) => area.label !== 'Other').length >= 4;
+
     return [
       {
         kind: 'recommendation',
-        title: 'Proceed to human review',
-        summary: 'No blocking GitHub metadata or validation signal was detected. Product and UX intent still need human judgment.',
+        title: broadReviewSurface ? 'Proceed with focused human review' : 'Proceed to human review',
+        summary: broadReviewSurface
+          ? 'No blocking signal was detected, but the PR touches multiple user-facing areas. Review the affected flows listed in Review focus before merge.'
+          : 'No blocking GitHub metadata or validation signal was detected. Product and UX intent still need human judgment.',
         confidence: 'medium',
         sourceUrl: pr.html_url,
       },
@@ -289,6 +407,10 @@ export function renderBriefMarkdown(brief: ProjectBrief) {
     '',
     ...renderValidation(brief.validation),
     '',
+    '## Review focus',
+    '',
+    ...renderReviewFocus(brief.reviewFocus),
+    '',
     '## Changed files',
     '',
     ...brief.changedFiles.map((file) => `- \`${file.path}\` — ${file.status}, +${file.additions}/-${file.deletions}`),
@@ -315,6 +437,21 @@ function renderValidation(validation: ValidationSignal[]) {
     const baseline = signal.isBaselineFailure ? ' baseline debt' : '';
     return `- **${signal.label}**: ${signal.status}${baseline} — ${signal.summary}`;
   });
+}
+
+function renderReviewFocus(reviewFocus: ReviewFocusArea[]) {
+  if (reviewFocus.length === 0) {
+    return ['No changed files were classified into review areas.'];
+  }
+
+  return reviewFocus.flatMap((area) => [
+    `### ${area.label}`,
+    '',
+    area.summary,
+    '',
+    ...area.files.map((file) => `- \`${file}\``),
+    '',
+  ]);
 }
 
 function renderFinding(finding: BriefFinding) {
