@@ -130,7 +130,7 @@ function classifyFileArea(path: string): (typeof REVIEW_FOCUS_AREA_ORDER)[number
     return 'App shell and navigation';
   }
 
-  if (path.includes('/components/ui/')) {
+  if (path.includes('/components/ui/') || path.includes('/components/page-header')) {
     return 'UI primitives';
   }
 
@@ -297,11 +297,13 @@ function buildRiskFindings(snapshot: PullRequestSnapshot, reviewFocus: ReviewFoc
     });
   }
 
-  if (reviewFocus.filter((area) => area.label !== 'Other').length >= 4) {
+  const userFacingReviewFocus = reviewFocus.filter((area) => area.label !== 'Other');
+
+  if (userFacingReviewFocus.length >= 4) {
     findings.push({
       kind: 'risk',
       title: 'Broad user-facing review surface',
-      summary: `The PR touches ${reviewFocus.length} review areas: ${reviewFocus.map((area) => area.label).join(', ')}. Validate the primary flows across affected surfaces, not just individual files.`,
+      summary: `The PR touches ${userFacingReviewFocus.length} user-facing review areas: ${userFacingReviewFocus.map((area) => area.label).join(', ')}. Validate the primary flows across affected surfaces, not just individual files.`,
       confidence: 'medium',
       sourceUrl: pr.html_url,
     });
