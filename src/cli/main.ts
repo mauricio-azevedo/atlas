@@ -1,4 +1,5 @@
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { buildPrBrief, renderBriefMarkdown, type ProjectBrief, type ValidationSignal } from '../brief.js';
 import { GitHubClient } from '../github.js';
 
@@ -22,12 +23,20 @@ async function main() {
   const validationPath = getFlagValue(flags, '--validation');
   const validation = validationPath ? await loadValidationSignals(validationPath) : [];
   const format = parseOutputFormat(getFlagValue(flags, '--format'));
+  const outputPath = getFlagValue(flags, '--output');
 
   const github = new GitHubClient(process.env.GITHUB_TOKEN);
   const snapshot = await github.getPullRequestSnapshot(repository, prNumber);
   const brief = buildPrBrief(snapshot, validation);
+  const rendered = renderBrief(brief, format);
 
-  process.stdout.write(renderBrief(brief, format));
+  if (outputPath) {
+    await mkdir(dirname(outputPath), { recursive: true });
+    await writeFile(outputPath, rendered, 'utf8');
+    return;
+  }
+
+  process.stdout.write(rendered);
 }
 
 function renderBrief(brief: ProjectBrief, format: OutputFormat) {
@@ -120,7 +129,7 @@ function getFlagValue(flags: string[], name: string) {
 
 function printUsage() {
   process.stderr.write(
-    'Usage:\n  npm run brief -- owner/repo 123 [--validation validation.json] [--format markdown|json]\n',
+    'Usage:\n  npm run brief -- owner/repo 123 [--validation validation.json] [--format markdown|json] [--output file]\n',
   );
 }
 
