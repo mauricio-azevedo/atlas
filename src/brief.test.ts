@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { buildPrBrief, type ValidationSignal } from './brief.js';
-import type { PullRequestSnapshot } from './github.js';
+import type { PullRequestSnapshot, WorkflowRun } from './github.js';
 
 const readySnapshot = makeSnapshot({
   draft: false,
@@ -28,6 +28,29 @@ const directFailure: ValidationSignal = {
 };
 
 assert.equal(buildPrBrief(readySnapshot, [directFailure]).status, 'attention');
+
+const successfulWorkflowSnapshot = makeSnapshot({
+  draft: false,
+  mergeable: true,
+  changedFiles: 3,
+  additions: 120,
+  deletions: 30,
+  workflowRuns: [makeWorkflowRun({ conclusion: 'success' })],
+});
+
+assert.equal(buildPrBrief(successfulWorkflowSnapshot).status, 'ready');
+assert.match(buildPrBrief(successfulWorkflowSnapshot).executiveSummary, /1 validation signal\(s\) passed/);
+
+const failedWorkflowSnapshot = makeSnapshot({
+  draft: false,
+  mergeable: true,
+  changedFiles: 3,
+  additions: 120,
+  deletions: 30,
+  workflowRuns: [makeWorkflowRun({ conclusion: 'failure' })],
+});
+
+assert.equal(buildPrBrief(failedWorkflowSnapshot).status, 'attention');
 
 const draftSnapshot = makeSnapshot({
   draft: true,
@@ -65,12 +88,14 @@ function makeSnapshot({
   changedFiles,
   additions,
   deletions,
+  workflowRuns = [],
 }: {
   draft: boolean;
   mergeable: boolean | null;
   changedFiles: number;
   additions: number;
   deletions: number;
+  workflowRuns?: WorkflowRun[];
 }): PullRequestSnapshot {
   return {
     repository: 'owner/repo',
@@ -96,5 +121,17 @@ function makeSnapshot({
       deletions: Math.floor(deletions / changedFiles),
       changes: Math.floor((additions + deletions) / changedFiles),
     })),
+    workflowRuns,
+  };
+}
+
+function makeWorkflowRun({ conclusion }: { conclusion: WorkflowRun['conclusion'] }): WorkflowRun {
+  return {
+    id: 1,
+    name: 'Quality',
+    status: 'completed',
+    conclusion,
+    html_url: 'https://github.com/owner/repo/actions/runs/1',
+    head_sha: 'head-sha',
   };
 }

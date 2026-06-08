@@ -22,10 +22,24 @@ export type PullRequestFile = {
   changes: number;
 };
 
+export type WorkflowRun = {
+  id: number;
+  name: string | null;
+  status: 'queued' | 'in_progress' | 'completed' | string;
+  conclusion: 'success' | 'failure' | 'cancelled' | 'skipped' | 'timed_out' | 'action_required' | null;
+  html_url: string;
+  head_sha: string;
+};
+
+type WorkflowRunsResponse = {
+  workflow_runs: WorkflowRun[];
+};
+
 export type PullRequestSnapshot = {
   repository: string;
   pullRequest: PullRequest;
   files: PullRequestFile[];
+  workflowRuns: WorkflowRun[];
 };
 
 export class GitHubClient {
@@ -35,8 +49,18 @@ export class GitHubClient {
     const [owner, repo] = parseRepository(repository);
     const pullRequest = await this.request<PullRequest>(`/repos/${owner}/${repo}/pulls/${prNumber}`);
     const files = await this.requestPaginated<PullRequestFile>(`/repos/${owner}/${repo}/pulls/${prNumber}/files`);
+    const workflowRuns = await this.getWorkflowRunsForCommit(repository, pullRequest.head.sha);
 
-    return { repository, pullRequest, files };
+    return { repository, pullRequest, files, workflowRuns };
+  }
+
+  async getWorkflowRunsForCommit(repository: string, commitSha: string): Promise<WorkflowRun[]> {
+    const [owner, repo] = parseRepository(repository);
+    const response = await this.request<WorkflowRunsResponse>(
+      `/repos/${owner}/${repo}/actions/runs?head_sha=${commitSha}&per_page=100`,
+    );
+
+    return response.workflow_runs;
   }
 
   private async request<T>(path: string): Promise<T> {
