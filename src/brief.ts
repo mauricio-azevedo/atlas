@@ -1,5 +1,7 @@
 import type { PullRequestSnapshot, WorkflowRun } from './github.js';
 
+export const PROJECT_BRIEF_SCHEMA_VERSION = 'atlas.projectBrief.v1';
+
 export type BriefStatus = 'ready' | 'attention' | 'blocked';
 export type Confidence = 'low' | 'medium' | 'high';
 
@@ -20,6 +22,7 @@ export type BriefFinding = {
 };
 
 export type ProjectBrief = {
+  schemaVersion: typeof PROJECT_BRIEF_SCHEMA_VERSION;
   subject: string;
   repository: string;
   status: BriefStatus;
@@ -44,6 +47,7 @@ export function buildPrBrief(snapshot: PullRequestSnapshot, validation: Validati
   const sourceUrl = pr.html_url;
 
   return {
+    schemaVersion: PROJECT_BRIEF_SCHEMA_VERSION,
     subject: `PR #${pr.number}: ${pr.title}`,
     repository: snapshot.repository,
     status,
