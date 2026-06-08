@@ -1,0 +1,18 @@
+[
+  {
+    "label": "web build",
+    "status": "passed",
+    "summary": "The web build passed in local validation."
+  },
+  {
+    "label": "mobile visual smoke test",
+    "status": "passed",
+    "summary": "No visibly broken mobile screens were found during manual smoke testing."
+  },
+  {
+    "label": "web lint",
+    "status": "failed",
+    "summary": "Lint fails, but the same failures are present on main, so this is baseline debt rather than a PR regression.",
+    "isBaselineFailure": true
+  }
+]
