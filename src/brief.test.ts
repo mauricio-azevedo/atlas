@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildPrBrief, type ValidationSignal } from './brief.js';
+import { PROJECT_BRIEF_SCHEMA_VERSION, buildPrBrief, type ValidationSignal } from './brief.js';
 import type { PullRequestSnapshot, WorkflowRun } from './github.js';
 
 const readySnapshot = makeSnapshot({
@@ -10,6 +10,7 @@ const readySnapshot = makeSnapshot({
   deletions: 30,
 });
 
+assert.equal(buildPrBrief(readySnapshot).schemaVersion, PROJECT_BRIEF_SCHEMA_VERSION);
 assert.equal(buildPrBrief(readySnapshot).status, 'ready');
 
 const baselineFailure: ValidationSignal = {
