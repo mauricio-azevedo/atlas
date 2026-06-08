@@ -6,11 +6,13 @@ Confidence: **medium**
 
 ## Executive summary
 
-PR #88 changes 16 files with 275 additions and 176 deletions. Atlas classifies it as ready. No explicit validation signals were provided.
+PR #88 changes 16 files with 275 additions and 176 deletions. Atlas classifies it as ready. Validation: 2 validation signal(s) passed; 1 failure(s) are marked as baseline debt.
 
 ## Validation
 
-No explicit validation signals were provided.
+- **web build**: passed — The web build passed in local validation.
+- **mobile visual smoke test**: passed — No visibly broken mobile screens were found during manual smoke testing.
+- **web lint**: failed baseline debt — Lint fails, but the same failures are present on main, so this is baseline debt rather than a PR regression.
 
 ## Changed files
 
@@ -39,6 +41,33 @@ Kind: **fact**
 Confidence: **high**
 
 The PR changes 16 files with 275 additions and 176 deletions.
+
+Source: https://github.com/mauricio-azevedo/beachrank/pull/88
+
+### web build passed
+
+Kind: **fact**
+Confidence: **medium**
+
+The web build passed in local validation.
+
+Source: https://github.com/mauricio-azevedo/beachrank/pull/88
+
+### mobile visual smoke test passed
+
+Kind: **fact**
+Confidence: **medium**
+
+No visibly broken mobile screens were found during manual smoke testing.
+
+Source: https://github.com/mauricio-azevedo/beachrank/pull/88
+
+### web lint is baseline debt
+
+Kind: **decision**
+Confidence: **medium**
+
+Lint fails, but the same failures are present on main, so this is baseline debt rather than a PR regression. Atlas will not treat this as a regression introduced by the PR.
 
 Source: https://github.com/mauricio-azevedo/beachrank/pull/88
 
