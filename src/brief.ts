@@ -5,11 +5,20 @@ export const PROJECT_BRIEF_SCHEMA_VERSION = 'atlas.projectBrief.v1';
 export type BriefStatus = 'ready' | 'attention' | 'blocked';
 export type Confidence = 'low' | 'medium' | 'high';
 
+export type SourceKind = 'pull_request' | 'workflow_run' | 'manual_validation';
+
+export type SourceRef = {
+  label: string;
+  url: string;
+  kind: SourceKind;
+};
+
 export type ValidationSignal = {
   label: string;
   status: 'passed' | 'failed' | 'neutral' | 'unknown';
   summary: string;
   sourceUrl?: string;
+  sourceKind?: SourceKind;
   isBaselineFailure?: boolean;
 };
 
@@ -19,6 +28,7 @@ export type BriefFinding = {
   summary: string;
   confidence: Confidence;
   sourceUrl: string;
+  sources: SourceRef[];
 };
 
 export type ReviewFocusArea = {
@@ -44,7 +54,7 @@ export type ProjectBrief = {
     additions: number;
     deletions: number;
   }>;
-  sources: Array<{ label: string; url: string }>;
+  sources: SourceRef[];
 };
 
 export function buildPrBrief(snapshot: PullRequestSnapshot, validation: ValidationSignal[] = []): ProjectBrief {
@@ -52,6 +62,7 @@ export function buildPrBrief(snapshot: PullRequestSnapshot, validation: Validati
   const allValidation = [...buildWorkflowValidationSignals(snapshot.workflowRuns), ...validation];
   const reviewFocus = buildReviewFocus(snapshot);
   const status = classifyStatus(snapshot, allValidation);
+  const pullRequestSource = buildPullRequestSource(snapshot);
   const sourceUrl = pr.html_url;
 
   return {
@@ -76,12 +87,29 @@ export function buildPrBrief(snapshot: PullRequestSnapshot, validation: Validati
         summary: `The PR changes ${pr.changed_files} files with ${pr.additions} additions and ${pr.deletions} deletions.`,
         confidence: 'high',
         sourceUrl,
+        sources: [pullRequestSource],
       },
       ...buildRiskFindings(snapshot, reviewFocus),
       ...buildValidationFindings(snapshot, allValidation),
     ],
     nextSteps: buildNextSteps(snapshot, status, reviewFocus),
-    sources: [{ label: `PR #${pr.number}`, url: sourceUrl }],
+    sources: [pullRequestSource],
+  };
+}
+
+function buildPullRequestSource(snapshot: PullRequestSnapshot): SourceRef {
+  return {
+    label: `PR #${snapshot.pullRequest.number}`,
+    url: snapshot.pullRequest.html_url,
+    kind: 'pull_request',
+  };
+}
+
+function buildValidationSource(snapshot: PullRequestSnapshot, signal: ValidationSignal): SourceRef {
+  return {
+    label: signal.label,
+    url: signal.sourceUrl ?? snapshot.pullRequest.html_url,
+    kind: signal.sourceKind ?? (signal.sourceUrl ? 'manual_validation' : 'pull_request'),
   };
 }
 
@@ -182,6 +210,7 @@ function buildWorkflowValidationSignals(workflowRuns: WorkflowRun[]): Validation
     status: mapWorkflowRunStatus(run),
     summary: buildWorkflowRunSummary(run),
     sourceUrl: run.html_url,
+    sourceKind: 'workflow_run',
   }));
 }
 
@@ -265,6 +294,7 @@ function buildExecutiveSummary(
 
 function buildRiskFindings(snapshot: PullRequestSnapshot, reviewFocus: ReviewFocusArea[]): BriefFinding[] {
   const pr = snapshot.pullRequest;
+  const pullRequestSource = buildPullRequestSource(snapshot);
   const findings: BriefFinding[] = [];
 
   if (pr.draft) {
@@ -274,6 +304,7 @@ function buildRiskFindings(snapshot: PullRequestSnapshot, reviewFocus: ReviewFoc
       summary: 'Draft PRs should not be treated as ready until the author explicitly moves them to review.',
       confidence: 'high',
       sourceUrl: pr.html_url,
+      sources: [pullRequestSource],
     });
   }
 
@@ -284,6 +315,7 @@ function buildRiskFindings(snapshot: PullRequestSnapshot, reviewFocus: ReviewFoc
       summary: 'GitHub reports this PR as not mergeable. Check conflicts or required checks.',
       confidence: 'high',
       sourceUrl: pr.html_url,
+      sources: [pullRequestSource],
     });
   }
 
@@ -294,6 +326,7 @@ function buildRiskFindings(snapshot: PullRequestSnapshot, reviewFocus: ReviewFoc
       summary: 'The PR is large enough that hidden regressions are more likely. Prefer focused review by flow or subsystem.',
       confidence: 'medium',
       sourceUrl: pr.html_url,
+      sources: [pullRequestSource],
     });
   }
 
@@ -306,6 +339,7 @@ function buildRiskFindings(snapshot: PullRequestSnapshot, reviewFocus: ReviewFoc
       summary: `The PR touches ${userFacingReviewFocus.length} user-facing review areas: ${userFacingReviewFocus.map((area) => area.label).join(', ')}. Validate the primary flows across affected surfaces, not just individual files.`,
       confidence: 'medium',
       sourceUrl: pr.html_url,
+      sources: [pullRequestSource],
     });
   }
 
@@ -319,13 +353,17 @@ function buildValidationFindings(
   const pr = snapshot.pullRequest;
 
   return validation.map((signal) => {
+    const source = buildValidationSource(snapshot, signal);
+    const sourceUrl = source.url;
+
     if (signal.status === 'failed' && signal.isBaselineFailure) {
       return {
         kind: 'decision' as const,
         title: `${signal.label} is baseline debt`,
         summary: `${signal.summary} Atlas will not treat this as a regression introduced by the PR.`,
         confidence: 'medium' as const,
-        sourceUrl: signal.sourceUrl ?? pr.html_url,
+        sourceUrl,
+        sources: [source],
       };
     }
 
@@ -335,7 +373,8 @@ function buildValidationFindings(
         title: `${signal.label} failed`,
         summary: signal.summary,
         confidence: 'medium' as const,
-        sourceUrl: signal.sourceUrl ?? pr.html_url,
+        sourceUrl,
+        sources: [source],
       };
     }
 
@@ -345,7 +384,8 @@ function buildValidationFindings(
         title: `${signal.label} passed`,
         summary: signal.summary,
         confidence: 'medium' as const,
-        sourceUrl: signal.sourceUrl ?? pr.html_url,
+        sourceUrl,
+        sources: [source],
       };
     }
 
@@ -354,7 +394,8 @@ function buildValidationFindings(
       title: `${signal.label} is unclear`,
       summary: signal.summary,
       confidence: 'low' as const,
-      sourceUrl: signal.sourceUrl ?? pr.html_url,
+      sourceUrl,
+      sources: [source],
     };
   });
 }
@@ -365,6 +406,7 @@ function buildNextSteps(
   reviewFocus: ReviewFocusArea[],
 ): BriefFinding[] {
   const pr = snapshot.pullRequest;
+  const pullRequestSource = buildPullRequestSource(snapshot);
 
   if (status === 'ready') {
     const broadReviewSurface = reviewFocus.filter((area) => area.label !== 'Other').length >= 4;
@@ -378,6 +420,7 @@ function buildNextSteps(
           : 'No blocking GitHub metadata or validation signal was detected. Product and UX intent still need human judgment.',
         confidence: 'medium',
         sourceUrl: pr.html_url,
+        sources: [pullRequestSource],
       },
     ];
   }
@@ -389,6 +432,7 @@ function buildNextSteps(
       summary: 'Atlas detected at least one risk signal. Review the finding list before merging.',
       confidence: 'medium',
       sourceUrl: pr.html_url,
+      sources: [pullRequestSource],
     },
   ];
 }
@@ -425,7 +469,7 @@ export function renderBriefMarkdown(brief: ProjectBrief) {
     ...brief.nextSteps.flatMap(renderFinding),
     '## Sources',
     '',
-    ...brief.sources.map((source) => `- [${source.label}](${source.url})`),
+    ...brief.sources.map((source) => `- [${source.label}](${source.url}) — ${source.kind}`),
     '',
   ].join('\n');
 }
@@ -465,7 +509,7 @@ function renderFinding(finding: BriefFinding) {
     '',
     finding.summary,
     '',
-    `Source: ${finding.sourceUrl}`,
+    ...finding.sources.map((source) => `Source: [${source.label}](${source.url}) — ${source.kind}`),
     '',
   ];
 }
