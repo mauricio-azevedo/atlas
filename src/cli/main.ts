@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises';
-import { buildPrBrief, renderBriefMarkdown, type ValidationSignal } from '../brief.js';
+import { buildPrBrief, renderBriefMarkdown, type ProjectBrief, type ValidationSignal } from '../brief.js';
 import { GitHubClient } from '../github.js';
+
+type OutputFormat = 'markdown' | 'json';
 
 async function main() {
   const [, , command, repository, prNumberRaw, ...flags] = process.argv;
@@ -19,12 +21,21 @@ async function main() {
 
   const validationPath = getFlagValue(flags, '--validation');
   const validation = validationPath ? await loadValidationSignals(validationPath) : [];
+  const format = parseOutputFormat(getFlagValue(flags, '--format'));
 
   const github = new GitHubClient(process.env.GITHUB_TOKEN);
   const snapshot = await github.getPullRequestSnapshot(repository, prNumber);
   const brief = buildPrBrief(snapshot, validation);
 
-  process.stdout.write(renderBriefMarkdown(brief));
+  process.stdout.write(renderBrief(brief, format));
+}
+
+function renderBrief(brief: ProjectBrief, format: OutputFormat) {
+  if (format === 'json') {
+    return `${JSON.stringify(brief, null, 2)}\n`;
+  }
+
+  return renderBriefMarkdown(brief);
 }
 
 async function loadValidationSignals(path: string): Promise<ValidationSignal[]> {
@@ -79,6 +90,18 @@ function parseValidationSignal(value: unknown): ValidationSignal {
   };
 }
 
+function parseOutputFormat(value: string | null): OutputFormat {
+  if (!value) {
+    return 'markdown';
+  }
+
+  if (value === 'markdown' || value === 'json') {
+    return value;
+  }
+
+  throw new Error('--format must be either markdown or json.');
+}
+
 function getFlagValue(flags: string[], name: string) {
   const index = flags.indexOf(name);
 
@@ -96,7 +119,9 @@ function getFlagValue(flags: string[], name: string) {
 }
 
 function printUsage() {
-  process.stderr.write('Usage:\n  npm run brief -- owner/repo 123 [--validation validation.json]\n');
+  process.stderr.write(
+    'Usage:\n  npm run brief -- owner/repo 123 [--validation validation.json] [--format markdown|json]\n',
+  );
 }
 
 await main();
