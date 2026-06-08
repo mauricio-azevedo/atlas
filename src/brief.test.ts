@@ -5,7 +5,7 @@ import type { PullRequestSnapshot, WorkflowRun } from './github.js';
 const readySnapshot = makeSnapshot({
   draft: false,
   mergeable: true,
-  changedFiles: 3,
+  files: ['src/file-1.ts', 'src/file-2.ts', 'src/file-3.ts'],
   additions: 120,
   deletions: 30,
 });
@@ -33,7 +33,7 @@ assert.equal(buildPrBrief(readySnapshot, [directFailure]).status, 'attention');
 const successfulWorkflowSnapshot = makeSnapshot({
   draft: false,
   mergeable: true,
-  changedFiles: 3,
+  files: ['src/file-1.ts', 'src/file-2.ts', 'src/file-3.ts'],
   additions: 120,
   deletions: 30,
   workflowRuns: [makeWorkflowRun({ conclusion: 'success' })],
@@ -45,7 +45,7 @@ assert.match(buildPrBrief(successfulWorkflowSnapshot).executiveSummary, /1 valid
 const failedWorkflowSnapshot = makeSnapshot({
   draft: false,
   mergeable: true,
-  changedFiles: 3,
+  files: ['src/file-1.ts', 'src/file-2.ts', 'src/file-3.ts'],
   additions: 120,
   deletions: 30,
   workflowRuns: [makeWorkflowRun({ conclusion: 'failure' })],
@@ -53,10 +53,46 @@ const failedWorkflowSnapshot = makeSnapshot({
 
 assert.equal(buildPrBrief(failedWorkflowSnapshot).status, 'attention');
 
+const broadSurfaceSnapshot = makeSnapshot({
+  draft: false,
+  mergeable: true,
+  files: [
+    'web/src/app/globals.css',
+    'web/src/components/bottom-nav.tsx',
+    'web/src/components/ui/button.tsx',
+    'web/src/features/feed/components/feed-item-card.tsx',
+    'web/src/features/groups/components/group-detail-tabs.tsx',
+    'web/src/features/matches/components/matches-list.tsx',
+    'web/src/features/profile/components/profile-header.tsx',
+  ],
+  additions: 120,
+  deletions: 30,
+});
+
+const broadSurfaceBrief = buildPrBrief(broadSurfaceSnapshot);
+
+assert.deepEqual(
+  broadSurfaceBrief.reviewFocus.map((area) => area.label),
+  [
+    'Global visual system',
+    'App shell and navigation',
+    'UI primitives',
+    'Home and feed',
+    'Groups',
+    'Matches',
+    'Profile and users',
+  ],
+);
+assert.equal(
+  broadSurfaceBrief.findings.some((finding) => finding.title === 'Broad user-facing review surface'),
+  true,
+);
+assert.equal(broadSurfaceBrief.nextSteps[0]?.title, 'Proceed with focused human review');
+
 const draftSnapshot = makeSnapshot({
   draft: true,
   mergeable: true,
-  changedFiles: 3,
+  files: ['src/file-1.ts', 'src/file-2.ts', 'src/file-3.ts'],
   additions: 120,
   deletions: 30,
 });
@@ -66,7 +102,7 @@ assert.equal(buildPrBrief(draftSnapshot).status, 'attention');
 const unmergeableSnapshot = makeSnapshot({
   draft: false,
   mergeable: false,
-  changedFiles: 3,
+  files: ['src/file-1.ts', 'src/file-2.ts', 'src/file-3.ts'],
   additions: 120,
   deletions: 30,
 });
@@ -76,7 +112,7 @@ assert.equal(buildPrBrief(unmergeableSnapshot).status, 'blocked');
 const largeSnapshot = makeSnapshot({
   draft: false,
   mergeable: true,
-  changedFiles: 25,
+  files: Array.from({ length: 25 }, (_, index) => `src/file-${index}.ts`),
   additions: 500,
   deletions: 350,
 });
@@ -86,14 +122,14 @@ assert.equal(buildPrBrief(largeSnapshot).status, 'attention');
 function makeSnapshot({
   draft,
   mergeable,
-  changedFiles,
+  files,
   additions,
   deletions,
   workflowRuns = [],
 }: {
   draft: boolean;
   mergeable: boolean | null;
-  changedFiles: number;
+  files: string[];
   additions: number;
   deletions: number;
   workflowRuns?: WorkflowRun[];
@@ -111,16 +147,16 @@ function makeSnapshot({
       body: null,
       additions,
       deletions,
-      changed_files: changedFiles,
+      changed_files: files.length,
       base: { ref: 'main', sha: 'base-sha' },
       head: { ref: 'feature', sha: 'head-sha' },
     },
-    files: Array.from({ length: changedFiles }, (_, index) => ({
-      filename: `src/file-${index}.ts`,
+    files: files.map((filename) => ({
+      filename,
       status: 'modified',
-      additions: Math.floor(additions / changedFiles),
-      deletions: Math.floor(deletions / changedFiles),
-      changes: Math.floor((additions + deletions) / changedFiles),
+      additions: Math.floor(additions / files.length),
+      deletions: Math.floor(deletions / files.length),
+      changes: Math.floor((additions + deletions) / files.length),
     })),
     workflowRuns,
   };
