@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { buildPrBrief, renderBriefMarkdown, type ProjectBrief, type ValidationSignal } from '../brief.js';
+import { buildPrBrief, renderBriefMarkdown, type ProjectBrief, type SourceKind, type ValidationSignal } from '../brief.js';
 import { GitHubClient } from '../github.js';
 
 type OutputFormat = 'markdown' | 'json';
@@ -86,6 +86,10 @@ function parseValidationSignal(value: unknown): ValidationSignal {
     throw new Error(`Validation signal ${signal.label} sourceUrl must be a string when provided.`);
   }
 
+  if (signal.sourceKind !== undefined && !isSourceKind(signal.sourceKind)) {
+    throw new Error(`Validation signal ${signal.label} sourceKind must be pull_request, workflow_run, or manual_validation.`);
+  }
+
   if (signal.isBaselineFailure !== undefined && typeof signal.isBaselineFailure !== 'boolean') {
     throw new Error(`Validation signal ${signal.label} isBaselineFailure must be a boolean when provided.`);
   }
@@ -95,8 +99,13 @@ function parseValidationSignal(value: unknown): ValidationSignal {
     status: signal.status,
     summary: signal.summary,
     sourceUrl: signal.sourceUrl,
+    sourceKind: signal.sourceKind,
     isBaselineFailure: signal.isBaselineFailure,
   };
+}
+
+function isSourceKind(value: unknown): value is SourceKind {
+  return value === 'pull_request' || value === 'workflow_run' || value === 'manual_validation';
 }
 
 function parseOutputFormat(value: string | null): OutputFormat {
