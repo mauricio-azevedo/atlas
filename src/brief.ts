@@ -109,7 +109,7 @@ function buildValidationSource(snapshot: PullRequestSnapshot, signal: Validation
   return {
     label: signal.label,
     url: signal.sourceUrl ?? snapshot.pullRequest.html_url,
-    kind: signal.sourceKind ?? (signal.sourceUrl ? 'manual_validation' : 'pull_request'),
+    kind: signal.sourceKind ?? 'manual_validation',
   };
 }
 
@@ -350,8 +350,6 @@ function buildValidationFindings(
   snapshot: PullRequestSnapshot,
   validation: ValidationSignal[],
 ): BriefFinding[] {
-  const pr = snapshot.pullRequest;
-
   return validation.map((signal) => {
     const source = buildValidationSource(snapshot, signal);
     const sourceUrl = source.url;
