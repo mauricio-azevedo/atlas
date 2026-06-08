@@ -22,6 +22,8 @@ Then it emits either:
 - a human-readable Markdown brief
 - a structured JSON brief for downstream product layers
 
+Atlas can print briefs to stdout or write them to files.
+
 ## Install
 
 ```bash
@@ -51,6 +53,20 @@ Markdown is the default:
 ```bash
 npm run brief -- owner/repo 123 --format markdown
 ```
+
+## Write a brief to a file
+
+```bash
+npm run brief -- owner/repo 123 --output briefs/pr-123.md
+```
+
+JSON output can also be written to a file:
+
+```bash
+npm run brief -- owner/repo 123 --format json --output briefs/pr-123.json
+```
+
+Atlas creates parent directories for the output path when needed.
 
 ## Private repositories and rate limits
 
