@@ -10,8 +10,18 @@ const readySnapshot = makeSnapshot({
   deletions: 30,
 });
 
-assert.equal(buildPrBrief(readySnapshot).schemaVersion, PROJECT_BRIEF_SCHEMA_VERSION);
-assert.equal(buildPrBrief(readySnapshot).status, 'ready');
+const readyBrief = buildPrBrief(readySnapshot);
+
+assert.equal(readyBrief.schemaVersion, PROJECT_BRIEF_SCHEMA_VERSION);
+assert.equal(readyBrief.status, 'ready');
+assert.deepEqual(readyBrief.sources, [
+  {
+    label: 'PR #123',
+    url: 'https://github.com/owner/repo/pull/123',
+    kind: 'pull_request',
+  },
+]);
+assert.deepEqual(readyBrief.findings[0]?.sources, readyBrief.sources);
 
 const baselineFailure: ValidationSignal = {
   label: 'web lint',
@@ -39,8 +49,20 @@ const successfulWorkflowSnapshot = makeSnapshot({
   workflowRuns: [makeWorkflowRun({ conclusion: 'success' })],
 });
 
-assert.equal(buildPrBrief(successfulWorkflowSnapshot).status, 'ready');
-assert.match(buildPrBrief(successfulWorkflowSnapshot).executiveSummary, /1 validation signal\(s\) passed/);
+const successfulWorkflowBrief = buildPrBrief(successfulWorkflowSnapshot);
+
+assert.equal(successfulWorkflowBrief.status, 'ready');
+assert.match(successfulWorkflowBrief.executiveSummary, /1 validation signal\(s\) passed/);
+assert.deepEqual(
+  successfulWorkflowBrief.findings.find((finding) => finding.title === 'Quality passed')?.sources,
+  [
+    {
+      label: 'Quality',
+      url: 'https://github.com/owner/repo/actions/runs/1',
+      kind: 'workflow_run',
+    },
+  ],
+);
 
 const failedWorkflowSnapshot = makeSnapshot({
   draft: false,
@@ -93,11 +115,13 @@ assert.equal(
     (finding) =>
       finding.title === 'Broad user-facing review surface' &&
       finding.summary.includes('7 user-facing review areas') &&
-      !finding.summary.includes('Other'),
+      !finding.summary.includes('Other') &&
+      finding.sources[0]?.kind === 'pull_request',
   ),
   true,
 );
 assert.equal(broadSurfaceBrief.nextSteps[0]?.title, 'Proceed with focused human review');
+assert.equal(broadSurfaceBrief.nextSteps[0]?.sources[0]?.kind, 'pull_request');
 
 const draftSnapshot = makeSnapshot({
   draft: true,
