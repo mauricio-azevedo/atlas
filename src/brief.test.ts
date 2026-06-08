@@ -30,7 +30,19 @@ const baselineFailure: ValidationSignal = {
   isBaselineFailure: true,
 };
 
-assert.equal(buildPrBrief(readySnapshot, [baselineFailure]).status, 'ready');
+const baselineBrief = buildPrBrief(readySnapshot, [baselineFailure]);
+
+assert.equal(baselineBrief.status, 'ready');
+assert.deepEqual(
+  baselineBrief.findings.find((finding) => finding.title === 'web lint is baseline debt')?.sources,
+  [
+    {
+      label: 'web lint',
+      url: 'https://github.com/owner/repo/pull/123',
+      kind: 'manual_validation',
+    },
+  ],
+);
 
 const directFailure: ValidationSignal = {
   label: 'web build',
