@@ -1,4 +1,4 @@
-import type { PullRequestSnapshot } from './github.js';
+import type { PullRequestSnapshot, WorkflowRun } from './github.js';
 
 export type BriefStatus = 'ready' | 'attention' | 'blocked';
 export type Confidence = 'low' | 'medium' | 'high';
@@ -39,7 +39,8 @@ export type ProjectBrief = {
 
 export function buildPrBrief(snapshot: PullRequestSnapshot, validation: ValidationSignal[] = []): ProjectBrief {
   const pr = snapshot.pullRequest;
-  const status = classifyStatus(snapshot, validation);
+  const allValidation = [...buildWorkflowValidationSignals(snapshot.workflowRuns), ...validation];
+  const status = classifyStatus(snapshot, allValidation);
   const sourceUrl = pr.html_url;
 
   return {
@@ -47,8 +48,8 @@ export function buildPrBrief(snapshot: PullRequestSnapshot, validation: Validati
     repository: snapshot.repository,
     status,
     confidence: 'medium',
-    executiveSummary: buildExecutiveSummary(snapshot, status, validation),
-    validation,
+    executiveSummary: buildExecutiveSummary(snapshot, status, allValidation),
+    validation: allValidation,
     changedFiles: snapshot.files.map((file) => ({
       path: file.filename,
       status: file.status,
@@ -64,11 +65,44 @@ export function buildPrBrief(snapshot: PullRequestSnapshot, validation: Validati
         sourceUrl,
       },
       ...buildRiskFindings(snapshot),
-      ...buildValidationFindings(snapshot, validation),
+      ...buildValidationFindings(snapshot, allValidation),
     ],
     nextSteps: buildNextSteps(snapshot, status),
     sources: [{ label: `PR #${pr.number}`, url: sourceUrl }],
   };
+}
+
+function buildWorkflowValidationSignals(workflowRuns: WorkflowRun[]): ValidationSignal[] {
+  return workflowRuns.map((run) => ({
+    label: run.name ?? `Workflow run ${run.id}`,
+    status: mapWorkflowRunStatus(run),
+    summary: buildWorkflowRunSummary(run),
+    sourceUrl: run.html_url,
+  }));
+}
+
+function mapWorkflowRunStatus(run: WorkflowRun): ValidationSignal['status'] {
+  if (run.status !== 'completed') {
+    return 'unknown';
+  }
+
+  if (run.conclusion === 'success') {
+    return 'passed';
+  }
+
+  if (run.conclusion === 'failure' || run.conclusion === 'timed_out' || run.conclusion === 'action_required') {
+    return 'failed';
+  }
+
+  return 'neutral';
+}
+
+function buildWorkflowRunSummary(run: WorkflowRun) {
+  if (run.status !== 'completed') {
+    return `GitHub Actions run is ${run.status}.`;
+  }
+
+  return `GitHub Actions run completed with conclusion: ${run.conclusion ?? 'unknown'}.`;
 }
 
 function classifyStatus(snapshot: PullRequestSnapshot, validation: ValidationSignal[]): BriefStatus {
