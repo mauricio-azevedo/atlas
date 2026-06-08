@@ -32,8 +32,9 @@ PR #88 changes 16 files with 275 additions and 176 deletions. Atlas classifies i
 
 ### UI primitives
 
-4 files affecting shared components used across multiple screens.
+5 files affecting shared components used across multiple screens.
 
+- `web/src/components/page-header.tsx`
 - `web/src/components/ui/badge.tsx`
 - `web/src/components/ui/button.tsx`
 - `web/src/components/ui/card.tsx`
@@ -65,12 +66,6 @@ PR #88 changes 16 files with 275 additions and 176 deletions. Atlas classifies i
 
 - `web/src/features/profile/components/profile-header.tsx`
 - `web/src/features/profile/components/profile-tabs.tsx`
-
-### Other
-
-1 file outside Atlas' current area classifier.
-
-- `web/src/components/page-header.tsx`
 
 
 ## Changed files
@@ -108,7 +103,7 @@ Source: https://github.com/mauricio-azevedo/beachrank/pull/88
 Kind: **risk**
 Confidence: **medium**
 
-The PR touches 8 review areas: Global visual system, App shell and navigation, UI primitives, Home and feed, Groups, Matches, Profile and users, Other. Validate the primary flows across affected surfaces, not just individual files.
+The PR touches 7 user-facing review areas: Global visual system, App shell and navigation, UI primitives, Home and feed, Groups, Matches, Profile and users. Validate the primary flows across affected surfaces, not just individual files.
 
 Source: https://github.com/mauricio-azevedo/beachrank/pull/88
 

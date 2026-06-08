@@ -42,8 +42,9 @@
     },
     {
       "label": "UI primitives",
-      "summary": "4 files affecting shared components used across multiple screens.",
+      "summary": "5 files affecting shared components used across multiple screens.",
       "files": [
+        "web/src/components/page-header.tsx",
         "web/src/components/ui/badge.tsx",
         "web/src/components/ui/button.tsx",
         "web/src/components/ui/card.tsx",
@@ -79,13 +80,6 @@
       "files": [
         "web/src/features/profile/components/profile-header.tsx",
         "web/src/features/profile/components/profile-tabs.tsx"
-      ]
-    },
-    {
-      "label": "Other",
-      "summary": "1 file outside Atlas' current area classifier.",
-      "files": [
-        "web/src/components/page-header.tsx"
       ]
     }
   ],
@@ -198,7 +192,7 @@
     {
       "kind": "risk",
       "title": "Broad user-facing review surface",
-      "summary": "The PR touches 8 review areas: Global visual system, App shell and navigation, UI primitives, Home and feed, Groups, Matches, Profile and users, Other. Validate the primary flows across affected surfaces, not just individual files.",
+      "summary": "The PR touches 7 user-facing review areas: Global visual system, App shell and navigation, UI primitives, Home and feed, Groups, Matches, Profile and users. Validate the primary flows across affected surfaces, not just individual files.",
       "confidence": "medium",
       "sourceUrl": "https://github.com/mauricio-azevedo/beachrank/pull/88"
     },
