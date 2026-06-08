@@ -3,6 +3,14 @@ import type { PullRequestSnapshot } from './github.js';
 export type BriefStatus = 'ready' | 'attention' | 'blocked';
 export type Confidence = 'low' | 'medium' | 'high';
 
+export type ValidationSignal = {
+  label: string;
+  status: 'passed' | 'failed' | 'neutral' | 'unknown';
+  summary: string;
+  sourceUrl?: string;
+  isBaselineFailure?: boolean;
+};
+
 export type BriefFinding = {
   kind: 'fact' | 'risk' | 'decision' | 'recommendation' | 'unknown';
   title: string;
@@ -17,6 +25,7 @@ export type ProjectBrief = {
   status: BriefStatus;
   confidence: Confidence;
   executiveSummary: string;
+  validation: ValidationSignal[];
   findings: BriefFinding[];
   nextSteps: BriefFinding[];
   changedFiles: Array<{
@@ -28,9 +37,9 @@ export type ProjectBrief = {
   sources: Array<{ label: string; url: string }>;
 };
 
-export function buildPrBrief(snapshot: PullRequestSnapshot): ProjectBrief {
+export function buildPrBrief(snapshot: PullRequestSnapshot, validation: ValidationSignal[] = []): ProjectBrief {
   const pr = snapshot.pullRequest;
-  const status = classifyStatus(snapshot);
+  const status = classifyStatus(snapshot, validation);
   const sourceUrl = pr.html_url;
 
   return {
@@ -38,11 +47,8 @@ export function buildPrBrief(snapshot: PullRequestSnapshot): ProjectBrief {
     repository: snapshot.repository,
     status,
     confidence: 'medium',
-    executiveSummary: [
-      `PR #${pr.number} changes ${pr.changed_files} files`,
-      `with ${pr.additions} additions and ${pr.deletions} deletions.`,
-      `Atlas classifies it as ${status}.`,
-    ].join(' '),
+    executiveSummary: buildExecutiveSummary(snapshot, status, validation),
+    validation,
     changedFiles: snapshot.files.map((file) => ({
       path: file.filename,
       status: file.status,
@@ -58,13 +64,14 @@ export function buildPrBrief(snapshot: PullRequestSnapshot): ProjectBrief {
         sourceUrl,
       },
       ...buildRiskFindings(snapshot),
+      ...buildValidationFindings(snapshot, validation),
     ],
     nextSteps: buildNextSteps(snapshot, status),
     sources: [{ label: `PR #${pr.number}`, url: sourceUrl }],
   };
 }
 
-function classifyStatus(snapshot: PullRequestSnapshot): BriefStatus {
+function classifyStatus(snapshot: PullRequestSnapshot, validation: ValidationSignal[]): BriefStatus {
   const pr = snapshot.pullRequest;
 
   if (pr.state === 'closed' && !pr.merged) {
@@ -73,6 +80,12 @@ function classifyStatus(snapshot: PullRequestSnapshot): BriefStatus {
 
   if (pr.mergeable === false) {
     return 'blocked';
+  }
+
+  const failingSignals = validation.filter((signal) => signal.status === 'failed' && !signal.isBaselineFailure);
+
+  if (failingSignals.length > 0) {
+    return 'attention';
   }
 
   if (pr.draft) {
@@ -84,6 +97,32 @@ function classifyStatus(snapshot: PullRequestSnapshot): BriefStatus {
   }
 
   return 'ready';
+}
+
+function buildExecutiveSummary(
+  snapshot: PullRequestSnapshot,
+  status: BriefStatus,
+  validation: ValidationSignal[],
+) {
+  const pr = snapshot.pullRequest;
+  const passedSignals = validation.filter((signal) => signal.status === 'passed');
+  const baselineFailures = validation.filter((signal) => signal.status === 'failed' && signal.isBaselineFailure);
+  const directFailures = validation.filter((signal) => signal.status === 'failed' && !signal.isBaselineFailure);
+
+  const validationSummary = [
+    passedSignals.length > 0 ? `${passedSignals.length} validation signal(s) passed` : null,
+    baselineFailures.length > 0 ? `${baselineFailures.length} failure(s) are marked as baseline debt` : null,
+    directFailures.length > 0 ? `${directFailures.length} failure(s) require attention` : null,
+  ]
+    .filter(Boolean)
+    .join('; ');
+
+  return [
+    `PR #${pr.number} changes ${pr.changed_files} files`,
+    `with ${pr.additions} additions and ${pr.deletions} deletions.`,
+    `Atlas classifies it as ${status}.`,
+    validationSummary ? `Validation: ${validationSummary}.` : 'No explicit validation signals were provided.',
+  ].join(' ');
 }
 
 function buildRiskFindings(snapshot: PullRequestSnapshot): BriefFinding[] {
@@ -123,6 +162,53 @@ function buildRiskFindings(snapshot: PullRequestSnapshot): BriefFinding[] {
   return findings;
 }
 
+function buildValidationFindings(
+  snapshot: PullRequestSnapshot,
+  validation: ValidationSignal[],
+): BriefFinding[] {
+  const pr = snapshot.pullRequest;
+
+  return validation.map((signal) => {
+    if (signal.status === 'failed' && signal.isBaselineFailure) {
+      return {
+        kind: 'decision' as const,
+        title: `${signal.label} is baseline debt`,
+        summary: `${signal.summary} Atlas will not treat this as a regression introduced by the PR.`,
+        confidence: 'medium' as const,
+        sourceUrl: signal.sourceUrl ?? pr.html_url,
+      };
+    }
+
+    if (signal.status === 'failed') {
+      return {
+        kind: 'risk' as const,
+        title: `${signal.label} failed`,
+        summary: signal.summary,
+        confidence: 'medium' as const,
+        sourceUrl: signal.sourceUrl ?? pr.html_url,
+      };
+    }
+
+    if (signal.status === 'passed') {
+      return {
+        kind: 'fact' as const,
+        title: `${signal.label} passed`,
+        summary: signal.summary,
+        confidence: 'medium' as const,
+        sourceUrl: signal.sourceUrl ?? pr.html_url,
+      };
+    }
+
+    return {
+      kind: 'unknown' as const,
+      title: `${signal.label} is unclear`,
+      summary: signal.summary,
+      confidence: 'low' as const,
+      sourceUrl: signal.sourceUrl ?? pr.html_url,
+    };
+  });
+}
+
 function buildNextSteps(snapshot: PullRequestSnapshot, status: BriefStatus): BriefFinding[] {
   const pr = snapshot.pullRequest;
 
@@ -131,7 +217,7 @@ function buildNextSteps(snapshot: PullRequestSnapshot, status: BriefStatus): Bri
       {
         kind: 'recommendation',
         title: 'Proceed to human review',
-        summary: 'No blocking GitHub metadata signal was detected. Product and UX intent still need human judgment.',
+        summary: 'No blocking GitHub metadata or validation signal was detected. Product and UX intent still need human judgment.',
         confidence: 'medium',
         sourceUrl: pr.html_url,
       },
@@ -161,6 +247,10 @@ export function renderBriefMarkdown(brief: ProjectBrief) {
     '',
     brief.executiveSummary,
     '',
+    '## Validation',
+    '',
+    ...renderValidation(brief.validation),
+    '',
     '## Changed files',
     '',
     ...brief.changedFiles.map((file) => `- \`${file.path}\` — ${file.status}, +${file.additions}/-${file.deletions}`),
@@ -176,6 +266,17 @@ export function renderBriefMarkdown(brief: ProjectBrief) {
     ...brief.sources.map((source) => `- [${source.label}](${source.url})`),
     '',
   ].join('\n');
+}
+
+function renderValidation(validation: ValidationSignal[]) {
+  if (validation.length === 0) {
+    return ['No explicit validation signals were provided.'];
+  }
+
+  return validation.map((signal) => {
+    const baseline = signal.isBaselineFailure ? ' baseline debt' : '';
+    return `- **${signal.label}**: ${signal.status}${baseline} — ${signal.summary}`;
+  });
 }
 
 function renderFinding(finding: BriefFinding) {
